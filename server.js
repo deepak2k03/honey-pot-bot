@@ -7,7 +7,6 @@ require('dotenv').config();
 const app = express();
 app.use(bodyParser.json());
 
-
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const MODEL_NAME = "gemini-pro";
 
@@ -29,6 +28,11 @@ app.post('/api/webhook', async (req, res) => {
 
         const responsePayload = {
             status: "success",
+            
+            // --- FIX START: Added the mandatory 'reply' field ---
+            reply: aiResponseText, 
+            // --- FIX END ---
+            
             scamDetected: isScam,
             engagementMetrics: {
                 engagementDurationSeconds: currentTurnCount * 15, // Approx 15s per turn
@@ -38,10 +42,10 @@ app.post('/api/webhook', async (req, res) => {
             agentNotes: "Engaging scammer to extract payment details."
         };
 
+        // Send response immediately to avoid timeout
         res.json(responsePayload);
 
-        
-        [cite_start]
+        // Check for "Game Over" condition to send the final report
         const hasCriticalInfo = extractedData.upiIds.length > 0 || extractedData.bankAccounts.length > 0;
         
         if (hasCriticalInfo || currentTurnCount >= 10) {
@@ -72,7 +76,8 @@ async function generateGeminiReply(currentText, history) {
         `;
         
         const result = await model.generateContent(prompt);
-        return result.response.text();
+        // Ensure we get clean text
+        return result.response.text().trim();
     } catch (e) {
         console.error("AI Error:", e);
         return "I am confused. Can you explain again?"; 
